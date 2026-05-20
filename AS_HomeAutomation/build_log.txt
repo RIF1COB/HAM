@@ -1,0 +1,2 @@
+Cannot load D:\SaiWorkspace\Frelance\HomeAutomationESP32\SW_Freezed\AS_HomeAutomation\build/project_description.json: [Errno 2] No such file or directory: 'D:\\SaiWorkspace\\Frelance\\HomeAutomationESP32\\SW_Freezed\\AS_HomeAutomation\\build/project_description.json'
+Executing action: all (aliases: build)

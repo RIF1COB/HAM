@@ -1,0 +1,4 @@
+vendor_id,device_id,logical_control,driver_symbol
+1,1,LIGHT_1,SWITCH1_driver
+1,1,LIGHT_2,SWITCH2_driver
+1,1,FAN_1,FAN1_driver
