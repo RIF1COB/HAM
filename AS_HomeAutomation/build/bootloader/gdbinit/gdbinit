@@ -1,2 +1,2 @@
-source D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader/gdbinit/symbols
-source D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader/gdbinit/connect
+source D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader/gdbinit/symbols
+source D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader/gdbinit/connect

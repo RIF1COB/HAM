@@ -2,34 +2,34 @@
 	"sources" : 
 	[
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/CMakeFiles/bootloader"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/CMakeFiles/bootloader"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/CMakeFiles/bootloader.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/CMakeFiles/bootloader.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/CMakeFiles/bootloader-complete.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/CMakeFiles/bootloader-complete.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
 		},
 		{
-			"file" : "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
+			"file" : "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
 		}
 	],
 	"target" : 

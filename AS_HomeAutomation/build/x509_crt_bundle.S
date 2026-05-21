@@ -1,4 +1,4 @@
-/* * Data converted from D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

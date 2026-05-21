@@ -10,18 +10,18 @@ if(NOT EXISTS "C:/Espressif/frameworks/esp-idf-v5.4.1/components/bootloader/subp
   file(MAKE_DIRECTORY "C:/Espressif/frameworks/esp-idf-v5.4.1/components/bootloader/subproject")
 endif()
 file(MAKE_DIRECTORY
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader"
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix"
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/tmp"
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp"
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src"
-  "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/tmp"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src"
+  "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

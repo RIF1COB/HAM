@@ -22,4 +22,4 @@ set confirm off
 set confirm on
 
 # Load application symbols
-file D:/SaiWorkspace/Frelance/HomeAutomationESP32/SW_Freezed/AS_HomeAutomation/build/bootloader/bootloader.elf
+file D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build/bootloader/bootloader.elf
