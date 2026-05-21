@@ -241,10 +241,13 @@ static void blufi_event_callback(esp_blufi_cb_event_t event, esp_blufi_cb_param_
         esp_blufi_extra_info_t info = {0};
         info.sta_ssid     = s_sta_cfg.sta.ssid;
         info.sta_ssid_len = strlen((char *)s_sta_cfg.sta.ssid);
-        esp_blufi_status_t st = s_sta_got_ip   ? ESP_BLUFI_STA_CONN_SUCCESS
-                              : s_sta_connecting ? ESP_BLUFI_STA_CONNECTING
-                              :                    ESP_BLUFI_STA_CONN_FAIL;
-        esp_blufi_send_wifi_conn_report(mode, st, 0, &info);
+        if (s_sta_got_ip) {
+            esp_blufi_send_wifi_conn_report(mode, ESP_BLUFI_STA_CONN_SUCCESS, 0, &info);
+        } else if (s_sta_connecting) {
+            esp_blufi_send_wifi_conn_report(mode, ESP_BLUFI_STA_CONNECTING, 0, &info);
+        } else {
+            esp_blufi_send_wifi_conn_report(mode, ESP_BLUFI_STA_CONN_FAIL, 0, &info);
+        }
         break;
     }
 

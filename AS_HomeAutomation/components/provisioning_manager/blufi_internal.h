@@ -17,7 +17,9 @@
 #define BLUFI_INFO(fmt, ...)   ESP_LOGI(BLUFI_EXAMPLE_TAG, fmt, ##__VA_ARGS__)
 #define BLUFI_ERROR(fmt, ...)  ESP_LOGE(BLUFI_EXAMPLE_TAG, fmt, ##__VA_ARGS__)
 
-#define BLUFI_DEVICE_NAME "AS_HomeAutomation"
+// Note: BLUFI_DEVICE_NAME is already defined in <esp_blufi.h>. We rely on the
+// BluFi profile's internal default; if a custom name is needed in the future,
+// set it via esp_ble_gap_set_device_name() *before* esp_blufi_adv_start().
 
 void blufi_dh_negotiate_data_handler(uint8_t *data, int len, uint8_t **output_data, int *output_len, bool *need_free);
 int  blufi_aes_encrypt(uint8_t iv8, uint8_t *crypt_data, int crypt_len);
