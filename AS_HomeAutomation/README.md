@@ -1,204 +1,244 @@
-| Supported Targets | ESP32-C3 | ESP32-S3 |
-| ----------------- | -------- | -------- |
+# AS_HomeAutomation
 
-# FreeRTOS basic API SMP usages Example
+ESP32-based home-automation firmware that controls lights and fans, accepts cloud commands (AWS IoT — currently simulated), and exposes a modular, event-driven architecture built on ESP-IDF 5.4.1.
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+| | |
+|---|---|
+| **Target** | ESP32 (dual-core) |
+| **Framework** | ESP-IDF 5.4.1 |
+| **Config version** | `CFG_2026_05_V1` |
+| **Build artifact** | `AS_HomeAutomation_07_May_2026.elf` |
 
-FreeRTOS offers a rich array of communication objects and task notification mechanisms that facilitate interaction and synchronization between concurrent tasks. This example demonstrates the applications of some useful APIs, including task creation, queue, mutex / spinlock, and task notification, within the context of a Symmetric Multiprocessor (SMP) architecture.
+A full reverse-engineered requirements spec is available at [docs/Requirements_Specification.md](docs/Requirements_Specification.md).
 
-## Contents of this example
-Below is short explanation of remaining files in the project folder.
+---
+
+## Features
+
+- **Modular component architecture** — each subsystem is an ESP-IDF component under [components/](components).
+- **Event bus** — FreeRTOS queue-based dispatcher decouples subsystems ([main/event_bus.c](main/event_bus.c)).
+- **Configuration-driven control mapping** — logical controls (`LIGHT_1`, `FAN_1`, …) are mapped to drivers via a CSV processed at build time by [tools/config_generator/generate_config.py](tools/config_generator/generate_config.py).
+- **Driver pool / GPIO HAL** — switch (digital) and fan (LEDC PWM) drivers; all GPIO/LEDC access is funneled through `gpio_manager`.
+- **JSON cloud command protocol** — cJSON-based parser in [components/device_control/cloud_command.c](components/device_control/cloud_command.c).
+- **AWS IoT simulation** — generates ON/OFF/BLINK test packets to exercise the control pipeline ([components/cloud_client/](components/cloud_client)).
+- **Persistent storage** — Wi-Fi credentials, AWS config, X.509 material, and write-once device identity in NVS.
+- **Feature flags** — compile-time gating of `dimming_enabled`, `fan_speed_control`, `ota_enabled`.
+- **Structured logging** — tagged log streams (`CFG`, `CTRL`, `DRV`, `AWS`, `BLE`, `OTA`, `FACT`).
+
+---
+
+## Architecture
 
 ```
++---------+     +--------------+     +----------------+
+|  Cloud  | --> | cloud_client | --> | device_control | --> driver_pool --> gpio_manager --> HW
++---------+     +--------------+     +----------------+
+                                            ^
+                          event_bus <-------+
+                              ^
+   provisioning_manager / connectivity_manager / storage_manager / security_manager
+```
+
+### Components
+| Component | Responsibility |
+|-----------|----------------|
+| [components/common](components/common) | `device_registry`, `driver_pool`, `gpio_manager`, `nvs_identity`, `feature_flags`, `structured_logging` |
+| [components/device_control](components/device_control) | Switch / fan-speed control, cloud command parsing |
+| [components/cloud_client](components/cloud_client) | Cloud transport + AWS simulation task |
+| [components/connectivity_manager](components/connectivity_manager) | **Wi-Fi STA only** — connect / reconnect, publish `EVT_NET_READY` *(stub)* |
+| [components/provisioning_manager](components/provisioning_manager) | **BLE end-to-end** — BT controller, NimBLE host, `wifi_prov_mgr`, `aws-config` endpoint, factory reset *(stub)* |
+| [components/storage_manager](components/storage_manager) | NVS-backed Wi-Fi / AWS config storage |
+| [components/security_manager](components/security_manager) | NVS-backed certificate storage |
+
+### Tasks
+| Task | Priority | Stack | Module |
+|------|---------:|------:|--------|
+| `event_dispatch_task` | 6 | 4096 | event_bus |
+| `prov_task` | 5 | 4096 | provisioning_manager |
+| `wifi_task` | 5 | 4096 | connectivity_manager |
+| `mqtt_task` | 5 | 4096 | cloud_client |
+| `device_task` | 5 | 2048 | device_control |
+| `aws_sim_task` | 5 | 4096 | cloud_client (simulator) |
+
+---
+
+## Default Hardware Mapping
+
+| Logical control | Driver | Pin / Channel |
+|-----------------|--------|---------------|
+| `LIGHT_1` | SWITCH1 | GPIO 2 (active-high) |
+| `LIGHT_2` | SWITCH2 | GPIO 4 (active-high) |
+| `FAN_1`   | FAN1 (PWM) | GPIO 5, LEDC ch.0, 5 kHz |
+
+To add or change mappings, edit [tools/config_generator/vendor_devices.csv](tools/config_generator) and rebuild — `config_generated.{h,c}` are regenerated at CMake configure time.
+
+---
+
+## Cloud Command Protocol
+
+All commands routed through `device_control_handle_cloud_packet()` use this JSON envelope:
+
+```json
+{
+  "protocol_ver": 1,
+  "msg_type": "CMD",
+  "cmd": "DEVICE_CONTROL",
+  "sub_cmd": "SET_SWITCH",
+  "msg_id": 1001,
+  "device_id": "DEV_001",
+  "payload": { "control": "LIGHT_1", "value": 1 },
+  "timestamp": 1715352000
+}
+```
+
+`sub_cmd` values:
+- `SET_SWITCH` — `payload.value ∈ {0, 1}`
+- `SET_FAN_SPEED` — `payload.speed ∈ [0, 100]`
+
+---
+
+## NVS Layout
+
+| Namespace | Contents | Notes |
+|-----------|----------|-------|
+| `identity` | vendor_id, device_id, provisioned flag | **write-once** |
+| `wifi` | SSID, password | populated by provisioning |
+| `aws` | endpoint, cert blob | populated by provisioning |
+| `certs` | device cert, private key, root CA | populated by provisioning |
+
+---
+
+## Provisioning (BluFi over BLE)
+
+On first boot the device has no Wi-Fi credentials and no AWS certificates. The transport for receiving them from a companion mobile app is **BluFi** — Espressif's BLE-based Wi-Fi configuration protocol — compatible with the [EspBlufi](https://github.com/EspressifApp/EspBlufi) mobile app (Android / iOS).
+
+Intended flow:
+
+1. On boot, [provisioning_manager](components/provisioning_manager) reads the `provisioned` flag from the `identity` NVS namespace.
+2. If **not provisioned**: bring up Wi-Fi (STA), BT controller (BLE-only), Bluedroid host, and the BluFi profile. Advertise as `AS_HomeAutomation`.
+   - `RECV_STA_SSID` / `RECV_STA_PASSWD` -> staged into `wifi_config_t`.
+   - `REQ_CONNECT_TO_AP` -> persisted via [storage_manager](components/storage_manager) `save_wifi_credentials()`, then `esp_wifi_connect()`.
+   - `RECV_CUSTOM_DATA` (JSON `{endpoint, device_cert, private_key, root_ca}`) -> persisted via [storage_manager](components/storage_manager) `save_aws_config()` + [security_manager](components/security_manager) `store_cert()`.
+   - `IP_EVENT_STA_GOT_IP` -> mark identity provisioned, deinit BluFi, release BT memory (~30 KB), publish `EVT_WIFI_CONFIGURED`.
+3. If **already provisioned**: skip BluFi, publish `EVT_WIFI_CONFIGURED` for [connectivity_manager](components/connectivity_manager).
+4. Factory-reset event: clear `wifi`, `aws`, `certs` (identity is write-once and preserved) and reboot back into BluFi.
+
+BluFi link-layer security: DH key negotiation + AES-CFB128 + CRC16 (built into BluFi; no PoP required).
+
+Current code status:
+
+| Piece | State |
+|-------|-------|
+| `CONFIG_BT_ENABLED` / `CONFIG_BT_BLUEDROID_ENABLED` / `CONFIG_BT_BLE_BLUFI_ENABLE` in [sdkconfig](sdkconfig) | **on** |
+| BluFi support files vendored from ESP-IDF example | [blufi_init.c](components/provisioning_manager/blufi_init.c), [blufi_security.c](components/provisioning_manager/blufi_security.c) |
+| `provisioning_manager` logic | **implemented**: BluFi callback handler, AWS JSON via custom-data, factory reset, EVT_WIFI_CONFIGURED publish |
+| `cloud_client_simulate_ble_receive()` | test helper only — not a real BLE GATT server |
+
+This work is tracked as **TBD-2 / TBD-3** in [docs/Requirements_Specification.md](docs/Requirements_Specification.md).
+
+### Module ownership: BLE vs Wi-Fi
+
+BLE and Wi-Fi are intentionally owned by **different** modules — `connectivity_manager` is **not** a catch-all for both.
+
+- **BLE lives entirely in [provisioning_manager](components/provisioning_manager).** It is brought up only when the device is unprovisioned, and torn down (with `esp_bt_mem_release()` to reclaim ~30 KB) immediately after `WIFI_PROV_END`. No other module links against the BT controller or host stack.
+- **Wi-Fi lives entirely in [connectivity_manager](components/connectivity_manager).** It subscribes to `EVT_WIFI_CONFIGURED`, reads creds from `storage_manager`, runs `esp_wifi`, handles reconnect / backoff, and publishes `EVT_NET_READY`.
+- **AWS / MQTT lives entirely in [cloud_client](components/cloud_client).** It subscribes to `EVT_NET_READY` and brings up the MQTT client.
+
+This split exists because the two radios have very different lifecycles (BLE: one-shot at first boot; Wi-Fi: continuous) and very different dependencies, and bundling them would force every build to link the BT stack even when it cannot run.
+
+---
+
+## End-to-End Responsibility Matrix
+
+Where each piece of the credential -> Wi-Fi -> AWS pipeline lives, and what is implemented today.
+
+| Concern | Module that owns it | Status |
+|---|---|---|
+| BLE GATT + Wi-Fi / AWS-cert reception from mobile app | [provisioning_manager](components/provisioning_manager) (uses **BluFi** profile + Bluedroid host) | **implemented** (BluFi, custom-data JSON for AWS material) |
+| Wi-Fi credentials -> NVS | [storage_manager](components/storage_manager) (namespace `wifi`) | implemented, **plaintext** |
+| AWS endpoint + cert blob -> NVS | [storage_manager](components/storage_manager) (namespace `aws`) | implemented, **plaintext** |
+| Device cert / private key / root CA -> NVS | [security_manager](components/security_manager) (namespace `certs`) | implemented, **plaintext** |
+| NVS encryption (XTS-AES via `nvs_keys` partition) | [security_manager](components/security_manager) (owns key lifecycle + `nvs_flash_secure_init`) | not configured |
+| Wi-Fi STA connect + reconnect | [connectivity_manager](components/connectivity_manager) | stub |
+| AWS IoT MQTT/TLS connect (mTLS with X.509) | [cloud_client](components/cloud_client) (`esp-mqtt` + `esp-tls` + `mbedtls`) | stub (simulator only) |
+| Inbound command parsing & routing (cJSON envelope) | [device_control](components/device_control) / [cloud_command.c](components/device_control/cloud_command.c) | **implemented** |
+| Driver execution & GPIO / PWM | [driver_pool](components/common) + [gpio_manager](components/common) | implemented |
+| Outbound telemetry / state publish | [cloud_client](components/cloud_client) | stub (logs only) |
+
+Target data flow:
+
+```
+mobile app --BLE--> provisioning_manager --(saves)--> storage_manager / security_manager  (encrypted NVS)
+                              |
+                         EVT_WIFI_CONFIGURED
+                              v
+                      connectivity_manager  --(esp_wifi)-->  Wi-Fi AP
+                              |
+                         EVT_NET_READY
+                              v
+                         cloud_client  --(MQTT / TLS / X.509)-->  AWS IoT
+                            ^       |
+                    publish |       | MQTT_EVENT_DATA (subscribe)
+                            |       v
+                  device_control_handle_cloud_packet()  (cJSON envelope validation)
+                                    |
+                            device_registry lookup
+                                    v
+                            driver_pool.execute()
+                                    v
+                            gpio_manager (GPIO / LEDC)
+```
+
+---
+
+## Build & Flash
+
+Prerequisites:
+- ESP-IDF **5.4.1** installed and `IDF_PATH` exported
+- Python 3 (for the config generator)
+
+```bash
+# from the project root
+idf.py set-target esp32
+idf.py build
+idf.py -p <PORT> flash monitor
+```
+
+The config generator runs automatically during `idf.py build`.
+
+---
+
+## Repository Layout
+
+```
+.
+├── main/                       # app_main, app_core, event_bus
+├── components/
+│   ├── common/                 # registry, driver pool, GPIO HAL, NVS identity, flags, logging
+│   ├── device_control/         # switch / fan control + cloud command parser
+│   ├── cloud_client/           # cloud transport + AWS simulation
+│   ├── connectivity_manager/   # Wi-Fi state (stub)
+│   ├── provisioning_manager/   # provisioning / factory reset (stub)
+│   ├── storage_manager/        # NVS Wi-Fi / AWS config
+│   └── security_manager/       # NVS certificate storage
+├── tools/config_generator/     # CSV -> config_generated.{h,c}
+├── docs/                       # Requirements spec, design notes
 ├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   ├── basic_freertos_smp_usage.h
-│   ├── basic_freertos_smp_usage.c
-│   ├── create_task_example.c
-│   ├── queue_example.c
-│   ├── lock_example.c
-│   ├── task_notify_example.c
-│   └── batch_processing_example.c
-├── pytest_smp_examples.py
-└── README.md                  This is the file you are currently reading
+└── sdkconfig
 ```
 
-This example includes 5 parts: 
+---
 
-### Creating task example
+## Status / Roadmap
 
-The first part is shows how to create tasks that can be pinned (affinity with a specific core) or unpinned (no particular affinity with any core) on ESP32 series CPU cores thanks to the API function `xTaskCreatePinnedToCore()`. 
+The following are **placeholders** today and are tracked in the requirements spec:
 
-In this case, there are 4 tasks created in total:
-* `pinned_task0_core0` task is created and pinned on core 0
-* `pinned_task1_core0` task is also created and pinned on core 0
-* `pinned_task2_core1` task is created and pinned on core 1
-* `unpinned_task` task is the last one, it is unpinned, which means it can be scheduled to run on any core.
- 
-A task can be unpinned by setting the `xCoreID` field to `tskNO_AFFINITY` when calling `xTaskCreatePinnedToCore()`.
+- Real MQTT-over-TLS to AWS IoT (currently simulated; `mqtt`, `esp-tls`, `mbedtls` are linked)
+- **BLE provisioning** — required to receive Wi-Fi credentials and AWS certificates on first boot; `CONFIG_BT_ENABLED` is currently off and `wifi_provisioning` is not linked (see the *Provisioning (BLE)* section above)
+- Wi-Fi provisioning workflow (`provisioning_manager` is a logging stub)
+- Connectivity state machine (`connectivity_manager` is a logging stub)
+- OTA update flow (feature flag exists)
+- Secure Boot V1 / Flash Encryption (supported by build, not enabled)
+- Application-level pytest suite
 
-
-#### Example Output
-In the task function, the API `esp_cpu_get_core_id()` is called to query on which core this task is currently running. The example should have the following console output that, "pinned_task0_core0" and "pinned_task1_core0" are running on core#0, while "pinned_task2_core1" is running on core#1, and "unpinned_task" can be running on both core#0 and core#1:
-
-```
-...
-I (2123) create task example: task#0 is running on core#0
-I (2133) create task example: task#1 is running on core#0
-I (2133) create task example: task#2 is running on core#1
-I (2153) create task example: task#3 is running on core#0
-I (2283) create task example: task#0 is running on core#0
-I (2293) create task example: task#1 is running on core#0
-I (2313) create task example: task#2 is running on core#1
-I (2323) create task example: task#3 is running on core#0
-I (2453) create task example: task#0 is running on core#0
-I (2463) create task example: task#1 is running on core#0
-I (2483) create task example: task#3 is running on core#0
-I (2483) create task example: task#2 is running on core#1
-I (2623) create task example: task#0 is running on core#0
-I (2633) create task example: task#1 is running on core#0
-I (2643) create task example: task#3 is running on core#0
-I (2653) create task example: task#2 is running on core#1
-I (2793) create task example: task#0 is running on core#0
-I (2803) create task example: task#1 is running on core#0
-I (2803) create task example: task#3 is running on core#1
-...
-
-```
-
-### Queue communication example
-The second part is about how to use FreeRTOS built-in queue to transmit data between tasks. In this example, one task is sending a number every 250 millisecond to a msg queue by calling API `xQueueGenericSend()`, and another task receives data from this queue by calling API `xQueueReceive()`
-
-#### Example Output
-The example should have the following console output:
-
-```
-I (1737813) queue example: sent data = 0
-I (1737813) queue example: received data = 0
-I (1738063) queue example: sent data = 1
-I (1738063) queue example: received data = 1
-I (1738313) queue example: sent data = 2
-I (1738313) queue example: received data = 2
-I (1738563) queue example: sent data = 3
-I (1738563) queue example: received data = 3
-I (1738813) queue example: sent data = 4
-I (1738813) queue example: received data = 4
-I (1739063) queue example: sent data = 5
-I (1739063) queue example: received data = 5
-I (1739313) queue example: sent data = 6
-I (1739313) queue example: received data = 6
-I (1739563) queue example: sent data = 7
-I (1739563) queue example: received data = 7
-I (1739813) queue example: sent data = 8
-I (1739813) queue example: received data = 8
-I (1740063) queue example: sent data = 9
-I (1740063) queue example: received data = 9
-I (1740313) queue example: sent data = 10
-I (1740313) queue example: received data = 10
-...
-```
-
-### Locks example
-In the third part, a simple comparison of performance between mutexes, spinlocks and atomic operations is presented, along with an instance of how to use mutexes as a mechanism for protecting shared resources. 
-
-To highlight the differences in performance between mutexes, spinlocks and atomic operations, this example implements two tasks that share a resource, which will be protected by mutex and spinlock and declared as an atomic type variable, respectively. Note: if this example runs on single core, only 1 task of each type will be created.
-
-The result illustrates that the spinlocks are faster because they don't trigger any context switch, but they are CPU-intensive. Using atomic operation is faster than using spinlock, because it doesn't involve entering and exiting critical sections. 
-
-#### Example Output
-The example should have the following console output:
-```
-I (5025) lock example: mutex task took 1562156 us on core1
-I (5025) lock example: mutex task took 1567546 us on core0
-I (7095) lock example: spinlock task took 73325 us on core0
-I (7095) lock example: spinlock task took 68326 us on core1
-I (9105) lock example: atomic task took 11806 us on core0
-I (9105) lock example: atomic task took 6810 us on core1
-I (10105) lock example: mutex task 0 created
-I (10105) lock example: task0 read value = 0 on core #0
-I (10105) lock example: mutex task 1 created
-I (10605) lock example: task0 set value = 1
-I (10605) lock example: task1 read value = 1 on core #1
-I (11105) lock example: task1 set value = 2
-I (11105) lock example: task0 read value = 2 on core #1
-I (11605) lock example: task0 set value = 3
-I (11605) lock example: task1 read value = 3 on core #1
-I (12105) lock example: task1 set value = 4
-I (12105) lock example: task0 read value = 4 on core #1
-I (12605) lock example: task0 set value = 5
-I (12605) lock example: task1 read value = 5 on core #1
-I (13105) lock example: task1 set value = 6
-...
-```
-
-### Task notification example
-Two tasks communicate via FreeRTOS task notification systems: one is sending notifications while the other receives them.
-
-#### Example Output
-The example should have the following console output:
-```
-I (392163) task notify example: send_task sends a notification
-I (392163) task notify example: 1 tasks pending
-I (392163) task notify example: rcv_task is processing this task notification
-I (393163) task notify example: send_task sends a notification
-I (393163) task notify example: 1 tasks pending
-I (393163) task notify example: rcv_task is processing this task notification
-I (394163) task notify example: send_task sends a notification
-I (394163) task notify example: 1 tasks pending
-I (394163) task notify example: rcv_task is processing this task notification
-I (395163) task notify example: send_task sends a notification
-I (395163) task notify example: 1 tasks pending
-I (395163) task notify example: rcv_task is processing this task notification
-I (396163) task notify example: send_task sends a notification
-I (396163) task notify example: 1 tasks pending
-I (396163) task notify example: rcv_task is processing this task notification
-...
-```
-
-### Batch processing example
-In the last part, a practical demonstration is provided wherein queues, mutexes, and task notifications are integrated to implement a realistic workflow, thereby exemplifying their practical utility in real-world scenarios.
-
-A task named **rcv_data_task** mimics receiving the irregularly arrived data. Every time a data item is received, it is pushed into a queue, and the received item number is increased by 1; once the task collects 5 data items, it sends a task notification to the **proc_data_task** to process this batch of data from the queue. When the latter task finishes processing, it will decrease the received item number by 5. Because both these 2 tasks can modify this global number, the modification action is protected by a mutex.
-
-#### Example Output
-The example should have the following console output:
-```
-I (2675163) batch processing example: enqueue data = 43
-I (2675563) batch processing example: enqueue data = 29
-I (2676013) batch processing example: enqueue data = 8
-I (2676463) batch processing example: enqueue data = 56
-I (2676873) batch processing example: enqueue data = 19
-I (2676873) batch processing example: dequeue data = 43
-I (2676873) batch processing example: dequeue data = 29
-I (2676883) batch processing example: dequeue data = 8
-I (2676883) batch processing example: dequeue data = 56
-I (2676883) batch processing example: dequeue data = 19
-I (2676893) batch processing example: decrease s_rcv_item_num to 0
-I (2677413) batch processing example: enqueue data = 51
-I (2677713) batch processing example: enqueue data = 5
-I (2678243) batch processing example: enqueue data = 93
-I (2678603) batch processing example: enqueue data = 66
-I (2679213) batch processing example: enqueue data = 32
-I (2679213) batch processing example: dequeue data = 51
-I (2679213) batch processing example: dequeue data = 5
-I (2679223) batch processing example: dequeue data = 93
-I (2679223) batch processing example: dequeue data = 66
-I (2679233) batch processing example: dequeue data = 32
-I (2679233) batch processing example: decrease s_rcv_item_num to 0
-...
-```
-
-## How to use this example
-
-This example utilizes an interactive console component so that you can select the part you would like to run through the terminal. You can type 'help' to get the list of commands; use UP/DOWN arrows to navigate through command history; press TAB when typing command name to auto-complete. For more information on the interactive terminal console component, please refer to [console](../../console/README.md). The supported commands include:
-
-* **help**: get the list of commands
-* **create_task**: run the creating task example
-* **queue**: run the queue example
-* **lock**: run the locks example
-* **task_notification**: run the task notification example
-* **batch_processing**: run the batch processing example
-
-Once a component starts running, it will be stopped in about 5 seconds. If you would like to extend the running time, please modify the value of macro **COMP_LOOP_PERIOD** in the header file inc.h.
+See [docs/Requirements_Specification.md](docs/Requirements_Specification.md) for the full requirement-by-requirement breakdown.
