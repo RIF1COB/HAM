@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "AS_HomeAutomation_07_May_2026",
-    "project_version":    "b4d30c4-dirty",
+    "project_version":    "70d7e14-dirty",
     "project_path":       "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.4.1",
     "build_dir":          "D:/SaiWorkspace/Frelance/GitHub/HomeAutomation/Firmware/HAM/AS_HomeAutomation/build",
